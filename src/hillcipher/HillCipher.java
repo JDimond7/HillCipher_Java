@@ -4,13 +4,12 @@ package hillcipher;
 
 import java.util.HashMap;
 import java.util.Arrays;
-
 import org.apache.commons.math3.linear.*; //third party library for efficient matrix computations. 
 
 public class HillCipher {
 	//if I add ' to alphastring, encrypt and decrypt are no longer inverses...!?!?!?
-    static String alphastring = "abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,;:!?()\"\n";
-	static double[][] exampleKey = {{3,1,2},{1,1,2},{2,1,4}}; //hard-coded key for now. 
+    //static String alphastring = "abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,;:!?()\"\n";
+	static String alphastring = "abcdefghijklmnopqrstuvwxyz "; 
 	public static enum Mode {ENCRYPT, DECRYPT};
 	static HashMap<Character, Integer> AlphaNum = makeAlphaNum();
 	
@@ -22,39 +21,38 @@ public class HillCipher {
 		return AlphaToNumbers;
 	}
 	
-	public static String cipher (String msg, Mode mode) { //input is "here is a string". Becomes "fsfatm ri bleynpdh"
-		//String msg = args[0]; //message from commandline
+	public static String cipher (String msg, double[][] exampleKey, Mode mode) { 
 		
-		RealMatrix m;
+		RealMatrix m = MatrixUtils.createRealMatrix(exampleKey);
 		Matrix key = new Matrix(3);
-		System.out.println(alphastring.length());//check # of symbols. 
+		//System.out.println(alphastring.length());//check # of symbols. 
 		
 		if (mode == Mode.ENCRYPT){ //usual
-			m = MatrixUtils.createRealMatrix(HillCipher.exampleKey);
 			key.element = m.getData();
 		} 
 		else if (mode == Mode.DECRYPT){ //turn procedure into decryption. 
-			m = MatrixUtils.createRealMatrix(HillCipher.exampleKey);
 			RealMatrix mInverse = new LUDecomposition(m).getSolver().getInverse();
 		
 			double mDet = new LUDecomposition(m).getDeterminant();
-			int modScale = modularInverse((int)mDet);
+			System.out.println("determinant as calculated is " + mDet);
+			//int modScale = modularInverse((int)mDet);
+			int modScale = modularInverse((int)Math.round(mDet), alphastring.length());
 		
 			mInverse = mInverse.scalarMultiply(mDet*modScale); //apply appropreiate scaling. 
 			key.element = mInverse.getData(); //try out the stuff from the library to invert. 
 		
 			//still required to make entries positive, then mod by # of symbols. 
+			System.out.println("Length of alphastring " + alphastring.length());
 			for (int i = 0; i < key.size(); i++) {
 				for (int j = 0; j < key.size(); j++) {
 					while (key.element[i][j] < 0.0){
 						key.element[i][j] += alphastring.length();
 					}
-					key.element[i][j] = key.element[i][j]%alphastring.length();
+					key.element[i][j] = Math.round(key.element[i][j])%alphastring.length();
+					System.out.println(key.element[i][j]);
 				}
-			
 			}
 		} 
-		
 
 		if (msg.length() % 3 != 0){//make message fit into blocks.
 			int spacesNeeded = 3-(msg.length()%3); //need to replace 3 later with size of key. 
@@ -92,45 +90,31 @@ public class HillCipher {
 		
 	}
 	
-	public static double[][] parseKey (String keyInput){
-		char[] keyCharArray = keyInput.trim().toCharArray(); //trim removes leading/trailing whitespace. 
-		
-		int valueCount=0; //number of numerical values. 
-		for(char c : keyCharArray){ //count spaces in keyInput. 
-			if (c == ' '){
-				valueCount++;
-			}
-		}
-		valueCount++; //A sentence with n spaces has n+1 words. 
-		int n = (int)Math.sqrt(valueCount); //how to be sure we get right results from this? 
-		
-		//go through keyCharArray and assemble numbers, and put into key array. 
-		int[] buf = new int[valueCount];
-		int temp = 0; //hold numbers while being built
-		int index = 0; //index buf
-		for(char c : keyCharArray){
-			if (c == ' '){
-				buf[index] = temp;
-				temp = 0;
-				index++;
-			} else {
-				temp = 10*temp + Character.getNumericValue(c);
-			}
+	public static double[][] parseKey(String keyInput){
+		String[] numbers = keyInput.trim().split(" "); //array of "numbers"
+		int[] values = new int[numbers.length];
+		for (int i = 0; i < numbers.length; i++) {
+			values[i] = Integer.parseInt(numbers[i]);
 		}
 		
 		//put into key array
+		int n = (int)Math.sqrt(values.length);
 		double[][] key = new double[n][n];
 		for (int i = 0; i < n; i++) {
 			for (int j = 0; j < n; j++) {
-				key[i][j] = buf[n*i+j];
+				key[i][j] = Math.round(values[n*i+j]);
 			}
 		}
 		
+		//print key for debug. This new one seems to work correctly. 
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				System.out.println(key[i][j]);
+			}
+		}
 		return key;
 	}
 	
-	
-	//currently getting strange results from the encryption process. 
 	public static int[] matrixVectorMult(double[][] m, int[] x){
 		int[] result = new int[x.length];
 		for (int i = 0; i < m[0].length; i++) {//m[0].length is simply the right number. 
@@ -143,14 +127,34 @@ public class HillCipher {
 		return result;
 	}
 	
-	public static int modularInverse(int a){ //horrible brute force for now. 
-		a = a%alphastring.length();
-		for (int i = 2; i < alphastring.length()-1; i++) {
-			if (a*i%alphastring.length() == 1){
-				return i;
-			}
+	public static int modularInverse(int a, int b){ //b will be #symbols.
+		//calculates the inverse of a modulo b via extended euclidean algorithm.
+		//System.out.println("a = " + a + ", b = " + b);
+		int[] r = {Math.max(a,b), Math.min(a,b)}; 
+		int[] s;
+		if (a <= b){
+			s = new int[]{0,1};
+		} else {
+			s = new int[]{1,0};
 		}
-		return -1; //err
+		
+		int q, temp;
+		while(r[1] != 0){
+			q = (int)Math.floor(r[0]/r[1]);
+			
+			temp = r[1];
+			r[1] = r[0] - q*r[1];
+			r[0] = temp;
+			
+			temp = s[1];
+			s[1] = s[0] - q*s[1];
+			s[0] = temp;
+		}
+		while (s[0] < 0){
+			s[0] += b;
+		}
+		System.out.println("modular inverse = " + s[0]);
+		return s[0];
 	}
 }
 
@@ -257,7 +261,7 @@ class Matrix{
 			}
 		}
 	}
-	
+
 	private double determinant(){//horrible/lazy way to get det of a 3x3
 		double det;
 		det = this.element[0][0]*this.element[1][1]*this.element[2][2]
@@ -268,7 +272,7 @@ class Matrix{
 			 -this.element[0][0]*this.element[1][2]*this.element[2][1];
 		return det;
 	}
-	
+
 	public static int modularInverse(int a){ //horrible brute force for now. 
 		a = a%27;
 		for (int i = 2; i < 26; i++) {
