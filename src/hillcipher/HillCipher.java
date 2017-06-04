@@ -120,6 +120,7 @@ public class HillCipher {
 	}
 	
 	public static int modularInverse(int a, int b){ //calculates the inverse of a modulo b via extended euclidean algorithm.
+		//variable names match those on Wikipedia's Extended Euclidean Algorithm page. 
 		int[] r = {Math.max(a,b), Math.min(a,b)}; 
 		int[] s;
 		if (a <= b){
