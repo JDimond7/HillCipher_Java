@@ -1,25 +1,17 @@
-/*
-Program currently encrypts and decrypts via a gui interface correctly. 
-TODO: Allow user to specify key. -- DONE!
-	  Validate keys
-	  Prevent user from using undefined characters
-	  Ensure a key is set! -- sort of done, default key hardcoded to be used if non provided. 
-	  Possibly allow user to pass a text file to be encrypted directly (i.e., skip the text area)
- 
-*/
 
 package hillcipher;
+import javax.swing.JOptionPane;
 import org.apache.commons.math3.linear.*;
 
 public class UI extends javax.swing.JFrame {
 	
-	double[][] encryptKey = {{23,53,87},{98,56,2},{98,123,73}};//{{3,1,2},{1,1,2},{2,1,4}};
-	//double[][] encryptKey = {{23,34,45},{13,24,35},{37,48,60}};
-	//this key gets correct determinant and modular inverse calculated. Yet the decryption still goes wrong. 
-	double[][] decryptKey;
+    //Default keys
+	double[][] encryptKey = {{23,53,87},{98,56,2},{98,123,73}};
+	double[][] decryptKey = {{23,58,26},{25,44,6},{71,51,18}};
 	
 	public UI() {
 		initComponents();
+		jTextArea1.setText("Standard key in use: 23 53 87 98 56 2 98 123 73");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -42,7 +34,6 @@ public class UI extends javax.swing.JFrame {
         SetKeyDialog.setTitle("Encryption Key");
         SetKeyDialog.setLocation(new java.awt.Point(300, 300));
         SetKeyDialog.setMinimumSize(new java.awt.Dimension(274, 95));
-        SetKeyDialog.setResizable(false);
 
         keyEntryBox.setText("3 1 2 1 1 2 2 1 4");
 
@@ -67,7 +58,7 @@ public class UI extends javax.swing.JFrame {
         SetKeyDialogLayout.setHorizontalGroup(
             SetKeyDialogLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, SetKeyDialogLayout.createSequentialGroup()
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap()
                 .addGroup(SetKeyDialogLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(SetKeyDialogLayout.createSequentialGroup()
                         .addComponent(OKButton)
@@ -76,8 +67,8 @@ public class UI extends javax.swing.JFrame {
                     .addGroup(SetKeyDialogLayout.createSequentialGroup()
                         .addComponent(jLabel1)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(keyEntryBox, javax.swing.GroupLayout.PREFERRED_SIZE, 171, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addGap(0, 13, Short.MAX_VALUE))
+                        .addComponent(keyEntryBox, javax.swing.GroupLayout.DEFAULT_SIZE, 171, Short.MAX_VALUE)))
+                .addGap(13, 13, 13))
         );
         SetKeyDialogLayout.setVerticalGroup(
             SetKeyDialogLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -163,13 +154,13 @@ public class UI extends javax.swing.JFrame {
 
     private void encryptButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_encryptButtonActionPerformed
         String message = jTextArea1.getText();
-		message = HillCipher.cipher(message, encryptKey, HillCipher.Mode.ENCRYPT);
+		message = HillCipher.cipher(message, encryptKey);
 		jTextArea1.setText(message);
     }//GEN-LAST:event_encryptButtonActionPerformed
 
     private void decryptButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_decryptButtonActionPerformed
         String message = jTextArea1.getText();
-		message = HillCipher.cipher(message, encryptKey, HillCipher.Mode.DECRYPT);
+		message = HillCipher.cipher(message, decryptKey);
 		jTextArea1.setText(message);
     }//GEN-LAST:event_decryptButtonActionPerformed
 
@@ -183,9 +174,45 @@ public class UI extends javax.swing.JFrame {
 
     private void OKButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_OKButtonActionPerformed
         String keyInput = keyEntryBox.getText();
-		//encryptKey = HillCipher.parseKey(keyInput);
-		RealMatrix temp = MatrixUtils.createRealMatrix(HillCipher.parseKey(keyInput));
+		double[][] keyBuffer;  
+		try{
+			keyBuffer = HillCipher.parseKey(keyInput);
+		}
+		catch(java.lang.NumberFormatException e){ //checks for integer input
+			JOptionPane.showMessageDialog(null, "Error: Key provided contains non-integer values.",
+											    "Key Entry Error",
+												JOptionPane.WARNING_MESSAGE);
+			return;
+		}
 		
+		if (keyBuffer == null){
+			JOptionPane.showMessageDialog(null, "Error: Key doesn't contain a square number of values.",
+												"Key Entry Error",
+												JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		
+		double[][] decryptKeyBuffer;
+		try{
+			decryptKeyBuffer = HillCipher.makeInverseKey(keyBuffer);
+		}
+		catch(SingularMatrixException e){
+			JOptionPane.showMessageDialog(null, "Error: Matrix is singular",
+												"Key Entry Error",
+												JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		
+		if (decryptKeyBuffer == null){
+			JOptionPane.showMessageDialog(null, "error: Matrix's determinant not coprime to # of symbols.",
+												"Key Entry Error",
+												JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		
+		//if all successful, update keys.
+		encryptKey = keyBuffer;
+		decryptKey = decryptKeyBuffer;
 		SetKeyDialog.setVisible(false);
     }//GEN-LAST:event_OKButtonActionPerformed
 
