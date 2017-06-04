@@ -1,4 +1,4 @@
-#HillCipher in Java
+# HillCipher in Java
 
 This is a reimplementation of my other program (in Racket), with some differences. The Racket application has two text areas, 
 one for plaintext and the other for ciphertext, while this one has only one text area. The programs also handle newlines differently, 
